@@ -36,11 +36,32 @@ echo ""
 
 # Detect AllMon3 installation
 ALLMON_URL=""
+ALLMON_FOUND=0
+
+# Check common AllMon3 locations
 if [ -d "/var/www/html/allmon3" ]; then
     ALLMON_URL="http://localhost/allmon3"
-    echo "✓ Found AllMon3: $ALLMON_URL"
+    ALLMON_FOUND=1
 elif [ -d "/usr/local/share/allmon3" ]; then
     ALLMON_URL="http://localhost/allmon3"
+    ALLMON_FOUND=1
+elif [ -d "/srv/http/allmon3" ]; then
+    ALLMON_URL="http://localhost/allmon3"
+    ALLMON_FOUND=1
+elif [ -f "/etc/allmon3.ini" ]; then
+    ALLMON_URL="http://localhost/allmon3"
+    ALLMON_FOUND=1
+fi
+
+# Check if allmon3 is accessible via web
+if [ $ALLMON_FOUND -eq 0 ]; then
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost/allmon3 | grep -q "200\|301\|302"; then
+        ALLMON_URL="http://localhost/allmon3"
+        ALLMON_FOUND=1
+    fi
+fi
+
+if [ $ALLMON_FOUND -eq 1 ]; then
     echo "✓ Found AllMon3: $ALLMON_URL"
 else
     echo "✗ AllMon3 not detected on this system"
@@ -49,17 +70,22 @@ fi
 # Detect node number from rpt.conf or asl.conf
 NODE_NUMBER=""
 if [ -f "/etc/asterisk/rpt.conf" ]; then
-    NODE_NUMBER=$(grep -E '^\[' /etc/asterisk/rpt.conf | grep -v general | head -1 | tr -d '[]')
+    # Get first valid node number (numeric only, not 'nodes' or 'general')
+    NODE_NUMBER=$(grep -E '^\[[0-9]+\]' /etc/asterisk/rpt.conf | head -1 | tr -d '[]')
     if [ -n "$NODE_NUMBER" ]; then
         echo "✓ Found node number: $NODE_NUMBER (from rpt.conf)"
     fi
 fi
 
 if [ -z "$NODE_NUMBER" ] && [ -f "/etc/asterisk/asl.conf" ]; then
-    NODE_NUMBER=$(grep -E '^\[' /etc/asterisk/asl.conf | grep -v general | head -1 | tr -d '[]')
+    NODE_NUMBER=$(grep -E '^\[[0-9]+\]' /etc/asterisk/asl.conf | head -1 | tr -d '[]')
     if [ -n "$NODE_NUMBER" ]; then
         echo "✓ Found node number: $NODE_NUMBER (from asl.conf)"
     fi
+fi
+
+if [ -z "$NODE_NUMBER" ]; then
+    echo "✗ Node number not detected"
 fi
 
 echo ""
