@@ -1,48 +1,99 @@
 #!/bin/bash
 #
-# HyperMon - Installation Script
-# This script installs dependencies and starts the proxy server
+# HyperMon PHP Installer
+# Installs HyperMon as a web application alongside AllMon3
 #
 
-set -e  # Exit on error
+set -e
 
-echo "======================"
-echo "HyperMon Setup"
-echo "======================"
+echo "=============================="
+echo "HyperMon Installer"
+echo "=============================="
 echo ""
 
-# Check if Python 3 is installed
-if ! command -v python3 &> /dev/null; then
-    echo "Error: Python 3 is not installed"
-    echo "Please install Python 3.7 or higher and try again"
+# Detect web root
+WEB_ROOT=""
+if [ -d "/var/www/html" ]; then
+    WEB_ROOT="/var/www/html"
+elif [ -d "/srv/http" ]; then
+    WEB_ROOT="/srv/http"
+elif [ -d "/usr/share/nginx/html" ]; then
+    WEB_ROOT="/usr/share/nginx/html"
+else
+    echo "Could not detect web root directory."
+    read -p "Enter web root path (e.g., /var/www/html): " WEB_ROOT
+fi
+
+if [ ! -d "$WEB_ROOT" ]; then
+    echo "Error: Directory $WEB_ROOT does not exist"
     exit 1
 fi
 
-echo "Python version: $(python3 --version)"
+echo "Web root: $WEB_ROOT"
 echo ""
 
-# Check if pip is installed
-if ! command -v pip3 &> /dev/null && ! command -v pip &> /dev/null; then
-    echo "Error: pip is not installed"
-    echo "Please install pip and try again"
+# Detect node number
+NODE_NUMBER=""
+if [ -f "/etc/asterisk/rpt.conf" ]; then
+    NODE_NUMBER=$(grep -E '^\[[0-9]+\]' /etc/asterisk/rpt.conf | head -1 | tr -d '[]')
+fi
+
+if [ -n "$NODE_NUMBER" ]; then
+    echo "Detected node number: $NODE_NUMBER"
+    read -p "Use this node? (Y/n): " CONFIRM
+    if [[ "$CONFIRM" =~ ^[Nn]$ ]]; then
+        read -p "Enter your node number: " NODE_NUMBER
+    fi
+else
+    read -p "Enter your node number: " NODE_NUMBER
+fi
+
+if [ -z "$NODE_NUMBER" ]; then
+    echo "Error: Node number is required"
     exit 1
 fi
 
-# Determine pip command
-PIP_CMD="pip3"
-if ! command -v pip3 &> /dev/null; then
-    PIP_CMD="pip"
-fi
+echo ""
+echo "Installing HyperMon to $WEB_ROOT/hypermon..."
+echo ""
 
-echo "Installing Python dependencies..."
-$PIP_CMD install -r requirements.txt --break-system-packages 2>/dev/null || \
-$PIP_CMD install -r requirements.txt
+# Create hypermon directory
+sudo mkdir -p "$WEB_ROOT/hypermon"
+
+# Copy files
+sudo cp index.html "$WEB_ROOT/hypermon/"
+sudo cp api.php "$WEB_ROOT/hypermon/"
+
+# Create config file with node number
+sudo tee "$WEB_ROOT/hypermon/config.js" > /dev/null <<EOF
+// HyperMon auto-generated configuration
+window.HYPERMON_CONFIG = {
+    yourNode: '$NODE_NUMBER',
+    allmonUrl: '/allmon3',
+    apiUrl: './api.php'
+};
+EOF
+
+# Set permissions
+sudo chown -R www-data:www-data "$WEB_ROOT/hypermon" 2>/dev/null || \
+sudo chown -R http:http "$WEB_ROOT/hypermon" 2>/dev/null || \
+sudo chown -R apache:apache "$WEB_ROOT/hypermon" 2>/dev/null || \
+sudo chmod -R 755 "$WEB_ROOT/hypermon"
 
 echo ""
-echo "Installation complete!"
+echo "=============================="
+echo "Installation Complete!"
+echo "=============================="
 echo ""
-echo "To start the proxy server, run:"
-echo "  python3 hypermon-proxy.py"
+echo "HyperMon is now installed!"
 echo ""
-echo "Then open hypermon.html in your web browser"
+echo "Access it at:"
+echo "  http://your-server/hypermon"
+echo "  http://$(hostname -I | awk '{print $1}')/hypermon"
+echo ""
+echo "Configuration:"
+echo "  Node Number: $NODE_NUMBER"
+echo "  AllMon3 URL: /allmon3"
+echo ""
+echo "73!"
 echo ""
