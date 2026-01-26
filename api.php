@@ -4,28 +4,36 @@
  * Provides API endpoints for fetching AllStarLink data
  */
 
+// Error handling
+error_reporting(0);
+ini_set('display_errors', 0);
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
 // Get the action from the request
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
-switch ($action) {
-    case 'keyed-nodes':
-        getKeyedNodes();
-        break;
-    case 'search-nodes':
-        searchNodes();
-        break;
-    case 'node-info':
-        getNodeInfo();
-        break;
-    case 'health':
-        healthCheck();
-        break;
-    default:
-        echo json_encode(['error' => 'Invalid action']);
-        break;
+try {
+    switch ($action) {
+        case 'keyed-nodes':
+            getKeyedNodes();
+            break;
+        case 'search-nodes':
+            searchNodes();
+            break;
+        case 'node-info':
+            getNodeInfo();
+            break;
+        case 'health':
+            healthCheck();
+            break;
+        default:
+            echo json_encode(['error' => 'Invalid action', 'success' => false]);
+            break;
+    }
+} catch (Exception $e) {
+    echo json_encode(['error' => $e->getMessage(), 'success' => false]);
 }
 
 /**
@@ -36,7 +44,7 @@ function getKeyedNodes() {
     $html = fetchUrl($url);
     
     if (!$html) {
-        echo json_encode(['success' => false, 'error' => 'Failed to fetch data', 'nodes' => []]);
+        echo json_encode(['success' => false, 'error' => 'Failed to fetch data from AllStarLink', 'nodes' => []]);
         return;
     }
     
@@ -69,7 +77,7 @@ function searchNodes() {
     $html = fetchUrl($url);
     
     if (!$html) {
-        echo json_encode(['success' => false, 'error' => 'Failed to fetch data', 'results' => []]);
+        echo json_encode(['success' => false, 'error' => 'Failed to fetch data from AllStarLink', 'results' => []]);
         return;
     }
     
@@ -98,7 +106,7 @@ function getNodeInfo() {
     $html = fetchUrl($url);
     
     if (!$html) {
-        echo json_encode(['success' => false, 'error' => 'Failed to fetch data']);
+        echo json_encode(['success' => false, 'error' => 'Failed to fetch data from AllStarLink']);
         return;
     }
     
@@ -120,7 +128,8 @@ function getNodeInfo() {
 function healthCheck() {
     echo json_encode([
         'status' => 'healthy',
-        'service' => 'HyperMon API'
+        'service' => 'HyperMon API',
+        'success' => true
     ]);
 }
 
@@ -128,19 +137,26 @@ function healthCheck() {
  * Fetch URL content
  */
 function fetchUrl($url) {
+    // Check if curl is available
+    if (!function_exists('curl_init')) {
+        return false;
+    }
+    
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     
     $result = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
     curl_close($ch);
     
-    if ($httpCode == 200) {
+    if ($httpCode >= 200 && $httpCode < 300) {
         return $result;
     }
     
@@ -153,38 +169,40 @@ function fetchUrl($url) {
 function parseNodesTable($html) {
     $nodes = [];
     
-    // Create DOMDocument
-    $dom = new DOMDocument();
-    @$dom->loadHTML($html);
+    // Simple regex parsing instead of DOM for better compatibility
+    // Look for table rows
+    preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $html, $rows);
     
-    // Find tables
-    $tables = $dom->getElementsByTagName('table');
-    
-    if ($tables->length == 0) {
+    if (!isset($rows[1]) || count($rows[1]) < 2) {
         return $nodes;
     }
     
-    // Get first table
-    $table = $tables->item(0);
-    $rows = $table->getElementsByTagName('tr');
-    
-    // Skip header row
-    for ($i = 1; $i < $rows->length; $i++) {
-        $row = $rows->item($i);
-        $cols = $row->getElementsByTagName('td');
+    // Skip first row (header)
+    for ($i = 1; $i < count($rows[1]); $i++) {
+        $row = $rows[1][$i];
         
-        if ($cols->length >= 3) {
-            $node = [
-                'node' => trim($cols->item(0)->textContent),
-                'callsign' => $cols->length > 1 ? trim($cols->item(1)->textContent) : '',
-                'location' => $cols->length > 2 ? trim($cols->item(2)->textContent) : '',
-                'description' => $cols->length > 3 ? trim($cols->item(3)->textContent) : ''
+        // Extract table cells
+        preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $row, $cells);
+        
+        if (!isset($cells[1]) || count($cells[1]) < 3) {
+            continue;
+        }
+        
+        // Clean cell content
+        $cellData = array_map(function($cell) {
+            return trim(strip_tags($cell));
+        }, $cells[1]);
+        
+        $nodeNum = $cellData[0];
+        
+        // Only add if node number is valid
+        if (!empty($nodeNum) && is_numeric($nodeNum)) {
+            $nodes[] = [
+                'node' => $nodeNum,
+                'callsign' => isset($cellData[1]) ? $cellData[1] : '',
+                'location' => isset($cellData[2]) ? $cellData[2] : '',
+                'description' => isset($cellData[3]) ? $cellData[3] : ''
             ];
-            
-            // Only add if node number is valid
-            if (!empty($node['node']) && is_numeric($node['node'])) {
-                $nodes[] = $node;
-            }
         }
     }
     

@@ -61,18 +61,16 @@ echo ""
 sudo mkdir -p "$WEB_ROOT/hypermon"
 
 # Copy files
-sudo cp index.html "$WEB_ROOT/hypermon/"
+sudo cp index.php "$WEB_ROOT/hypermon/"
 sudo cp api.php "$WEB_ROOT/hypermon/"
 
 # Create config file with node number
-sudo tee "$WEB_ROOT/hypermon/config.js" > /dev/null <<EOF
-// HyperMon auto-generated configuration
-window.HYPERMON_CONFIG = {
-    yourNode: '$NODE_NUMBER',
-    allmonUrl: '/allmon3',
-    apiUrl: './api.php'
-};
-EOF
+sudo tee "$WEB_ROOT/hypermon/config.php" > /dev/null <<PHPCODE
+<?php
+// HyperMon Configuration
+\$HYPERMON_NODE = '$NODE_NUMBER';
+?>
+PHPCODE
 
 # Set permissions
 sudo chown -R www-data:www-data "$WEB_ROOT/hypermon" 2>/dev/null || \
