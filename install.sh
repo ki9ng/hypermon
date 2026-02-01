@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# HyperMon PHP Installer
-# Installs HyperMon as a web application alongside AllMon3
+# HyperMon Installer
 #
 
 set -e
@@ -61,22 +60,48 @@ echo ""
 sudo mkdir -p "$WEB_ROOT/hypermon"
 
 # Copy files
+echo "Copying files..."
 sudo cp index.php "$WEB_ROOT/hypermon/"
 sudo cp api.php "$WEB_ROOT/hypermon/"
+[ -f "test-api.php" ] && sudo cp test-api.php "$WEB_ROOT/hypermon/" || true
 
-# Create config file with node number
-sudo tee "$WEB_ROOT/hypermon/config.php" > /dev/null <<PHPCODE
-<?php
-// HyperMon Configuration
-\$HYPERMON_NODE = '$NODE_NUMBER';
-?>
-PHPCODE
+# Create config file
+echo "Creating config..."
+sudo sh -c "echo '<?php' > '$WEB_ROOT/hypermon/config.php'"
+sudo sh -c "echo '// HyperMon Configuration' >> '$WEB_ROOT/hypermon/config.php'"
+sudo sh -c "echo '\$HYPERMON_NODE = \"$NODE_NUMBER\";' >> '$WEB_ROOT/hypermon/config.php'"
+sudo sh -c "echo '?>' >> '$WEB_ROOT/hypermon/config.php'"
 
 # Set permissions
+echo "Setting permissions..."
 sudo chown -R www-data:www-data "$WEB_ROOT/hypermon" 2>/dev/null || \
 sudo chown -R http:http "$WEB_ROOT/hypermon" 2>/dev/null || \
 sudo chown -R apache:apache "$WEB_ROOT/hypermon" 2>/dev/null || \
 sudo chmod -R 755 "$WEB_ROOT/hypermon"
+
+# Check if php-curl is installed
+echo ""
+echo "Checking dependencies..."
+if php -m 2>/dev/null | grep -q curl; then
+    echo "PHP CURL: Installed"
+else
+    echo ""
+    echo "WARNING: PHP CURL is not installed!"
+    echo "HyperMon requires php-curl to fetch data from AllStarLink."
+    echo ""
+    echo "Install it with:"
+    echo "  sudo apt update"
+    echo "  sudo apt install php-curl"
+    echo "  sudo systemctl restart apache2"
+    echo ""
+    read -p "Would you like to install php-curl now? (Y/n): " INSTALL_CURL
+    if [[ ! "$INSTALL_CURL" =~ ^[Nn]$ ]]; then
+        sudo apt update
+        sudo apt install -y php-curl
+        sudo systemctl restart apache2 2>/dev/null || sudo systemctl restart nginx 2>/dev/null || true
+        echo "PHP CURL installed!"
+    fi
+fi
 
 echo ""
 echo "=============================="
@@ -92,6 +117,9 @@ echo ""
 echo "Configuration:"
 echo "  Node Number: $NODE_NUMBER"
 echo "  AllMon3 URL: /allmon3"
+echo ""
+echo "Test the API at:"
+echo "  http://your-server/hypermon/test-api.php"
 echo ""
 echo "73!"
 echo ""
