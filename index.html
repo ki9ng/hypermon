@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyperMon - Active Node Discovery</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #1e3c72;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .config-panel {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .config-panel h2 {
+            color: #1e3c72;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 4px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="text"], input[type="url"], input[type="number"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2a5298;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2a5298;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1e3c72;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .main-content {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .content-header h2 {
+            color: #1e3c72;
+            font-size: 20px;
+        }
+
+        .node-count {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-message.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .node-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .node-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .node-item:last-child {
+            border-bottom: none;
+        }
+
+        .node-item:hover {
+            background: #f8f9fa;
+        }
+
+        .node-item:active {
+            background: #e9ecef;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .status-keyed {
+            background: #28a745;
+            box-shadow: 0 0 6px #28a745;
+        }
+
+        .node-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .node-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e3c72;
+            margin-bottom: 2px;
+        }
+
+        .node-callsign {
+            font-size: 15px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .node-location {
+            font-size: 13px;
+            color: #666;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .node-description {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .show-config {
+            display: inline-block;
+            color: #2a5298;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 5px;
+            }
+
+            header {
+                padding: 12px 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .main-content {
+                padding: 15px;
+            }
+
+            .node-item {
+                padding: 10px 12px;
+            }
+
+            .node-number {
+                font-size: 16px;
+            }
+
+            .node-callsign {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HyperMon</h1>
+            <div class="subtitle">Mobile-first active node discovery for AllStarLink</div>
+        </header>
+
+        <div class="config-panel hidden" id="config-panel">
+            <h2>Configuration</h2>
+            <div class="input-group">
+                <label for="allmon-url">AllMon3 URL</label>
+                <input type="url" id="allmon-url" placeholder="http://your-server/allmon3">
+            </div>
+            <div class="input-group">
+                <label for="your-node">Your Node Number</label>
+                <input type="number" id="your-node" placeholder="123456">
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
+                <button class="btn-secondary" onclick="toggleConfig()">Close</button>
+            </div>
+            <div id="config-status"></div>
+        </div>
+
+        <div class="main-content">
+            <div class="content-header">
+                <div>
+                    <h2>Active Nodes</h2>
+                    <div class="node-count" id="node-count">Loading...</div>
+                </div>
+                <div class="button-group">
+                    <button class="btn-primary btn-small" onclick="loadKeyedNodes()">Refresh</button>
+                    <button class="btn-secondary btn-small" onclick="toggleConfig()">Config</button>
+                </div>
+            </div>
+
+            <div id="status-message"></div>
+
+            <div id="nodes-container">
+                <div class="empty-state">
+                    <p>Loading active nodes...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let settings = {
+            allmonUrl: localStorage.getItem('allmonUrl') || '',
+            yourNode: localStorage.getItem('yourNode') || '',
+            proxyUrl: 'api.php'
+        };
+
+        let autoRefreshInterval = null;
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            // Populate config fields
+            document.getElementById('allmon-url').value = settings.allmonUrl;
+            document.getElementById('your-node').value = settings.yourNode;
+
+            // Load nodes immediately
+            loadKeyedNodes();
+
+            // Start auto-refresh (every 30 seconds)
+            autoRefreshInterval = setInterval(loadKeyedNodes, 30000);
+        });
+
+        function toggleConfig() {
+            const panel = document.getElementById('config-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        function saveConfig() {
+            settings.allmonUrl = document.getElementById('allmon-url').value.trim();
+            settings.yourNode = document.getElementById('your-node').value.trim();
+
+            localStorage.setItem('allmonUrl', settings.allmonUrl);
+            localStorage.setItem('yourNode', settings.yourNode);
+
+            showConfigStatus('Configuration saved successfully', 'success');
+        }
+
+        function showConfigStatus(message, type) {
+            const statusDiv = document.getElementById('config-status');
+            statusDiv.innerHTML = `<div class="status-message ${type}">${message}</div>`;
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 3000);
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.innerHTML = `<div class="status-message ${type}">${message}</div>`;
+            
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        async function loadKeyedNodes() {
+            const container = document.getElementById('nodes-container');
+            const countDiv = document.getElementById('node-count');
+
+            showStatus('Loading active nodes...', 'loading');
+
+            try {
+                const response = await fetch(`${settings.proxyUrl}?action=keyed-nodes`);
+                const data = await response.json();
+
+                if (data.success && data.nodes && data.nodes.length > 0) {
+                    displayNodeList(data.nodes);
+                    countDiv.textContent = `${data.count} node${data.count !== 1 ? 's' : ''} currently active`;
+                    showStatus('', ''); // Clear loading message
+                } else if (data.success && data.nodes.length === 0) {
+                    showEmptyState('No nodes currently transmitting');
+                    countDiv.textContent = 'No active nodes';
+                    showStatus('', '');
+                } else {
+                    throw new Error(data.error || 'Failed to load nodes');
+                }
+            } catch (error) {
+                console.error('Error loading keyed nodes:', error);
+                showEmptyState('Failed to load active nodes');
+                countDiv.textContent = 'Error';
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function displayNodeList(nodes) {
+            const container = document.getElementById('nodes-container');
+            
+            let html = '<div class="node-list">';
+            
+            nodes.forEach(node => {
+                html += `
+                    <div class="node-item" onclick="connectToNode('${node.node}')">
+                        <div class="status-dot status-${node.status || 'keyed'}"></div>
+                        <div class="node-main">
+                            <div class="node-number">${node.node}</div>
+                            <div class="node-callsign">${node.callsign || 'Unknown'}</div>
+                            ${node.location ? `<div class="node-location">${node.location}</div>` : ''}
+                            ${node.description ? `<div class="node-description">${node.description}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function showEmptyState(message) {
+            const container = document.getElementById('nodes-container');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <p>${message}</p>
+                    <span class="show-config" onclick="toggleConfig()">Check configuration</span>
+                </div>
+            `;
+        }
+
+        function connectToNode(nodeNumber) {
+            if (!settings.allmonUrl || !settings.yourNode) {
+                showStatus('Please configure AllMon3 URL and node number first', 'error');
+                toggleConfig();
+                return;
+            }
+
+            const connectUrl = `${settings.allmonUrl}/link.php?node=${settings.yourNode}&links=${nodeNumber}`;
+            
+            window.open(connectUrl, '_blank');
+            
+            showStatus(`Connection request sent to node ${nodeNumber}`, 'success');
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                e.preventDefault();
+                loadKeyedNodes();
+            }
+        });
+    </script>
+</body>
+</html>
