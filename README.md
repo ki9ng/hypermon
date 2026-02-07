@@ -4,10 +4,10 @@ A mobile-first web interface for AllStarLink nodes, designed for quick discovery
 
 ## Quick Install
 
-**One-line install for AllStarLink nodes:**
+**One-line install/update for AllStarLink nodes:**
 
 ```bash
-cd /var/www/html && sudo wget https://github.com/ki9ng/hypermon/archive/main.tar.gz && sudo tar -xzf main.tar.gz && sudo mv hypermon-main hypermon && sudo chown -R www-data:www-data hypermon && sudo rm main.tar.gz && echo "HyperMon installed! Access at http://$(hostname -I | awk '{print $1}')/hypermon/"
+cd /var/www/html && sudo rm -rf hypermon && sudo wget https://github.com/ki9ng/hypermon/archive/main.tar.gz && sudo tar -xzf main.tar.gz && sudo mv hypermon-main hypermon && sudo chown -R www-data:www-data hypermon && sudo rm main.tar.gz && echo "HyperMon installed! Access at http://$(hostname -I | awk '{print $1}')/hypermon/"
 ```
 
 Then access at `http://your-node-ip/hypermon/`
