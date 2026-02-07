@@ -1,40 +1,26 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Configuration files with credentials
+config/config.php
 
-# Virtual environments
-venv/
-ENV/
-env/
+# Cache and temporary files
+*.cache
+*.tmp
+cache/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
 # Logs
 *.log
+logs/
+
+# PHP
+vendor/
+composer.lock
