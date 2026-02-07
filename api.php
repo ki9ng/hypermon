@@ -149,8 +149,10 @@ function connectNode() {
     // Clean up AllMon URL
     $allmonUrl = rtrim($allmonUrl, '/');
     
-    // AllMon3 connect endpoint
-    $connectUrl = $allmonUrl . '/link.php?node=' . urlencode($node) . '&link=' . urlencode($remote);
+    // AllMon3 connect endpoint - try API first, then fall back to link.php
+    // Remove trailing slash from allmonUrl if present
+    $baseUrl = rtrim($allmonUrl, '/');
+    $connectUrl = $baseUrl . '/api/link/' . urlencode($node) . '/' . urlencode($remote);
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $connectUrl);
@@ -206,7 +208,8 @@ function disconnectNode() {
     $allmonUrl = rtrim($allmonUrl, '/');
     
     // AllMon3 disconnect endpoint
-    $disconnectUrl = $allmonUrl . '/link.php?node=' . urlencode($node) . '&unlink=' . urlencode($remote);
+    $baseUrl = rtrim($allmonUrl, '/');
+    $disconnectUrl = $baseUrl . '/api/unlink/' . urlencode($node) . '/' . urlencode($remote);
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $disconnectUrl);
