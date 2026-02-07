@@ -2,6 +2,16 @@
 
 A mobile-first web interface for AllStarLink nodes, designed for quick discovery and connection to active nodes.
 
+## Quick Install
+
+**One-line install for AllStarLink nodes:**
+
+```bash
+cd /var/www/html && sudo wget https://github.com/ki9ng/hypermon/archive/main.tar.gz && sudo tar -xzf main.tar.gz && sudo mv hypermon-main hypermon && sudo chown -R www-data:www-data hypermon && sudo rm main.tar.gz && echo "HyperMon installed! Access at http://$(hostname -I | awk '{print $1}')/hypermon/"
+```
+
+Then access at `http://your-node-ip/hypermon/`
+
 ## The Problem
 
 Current AllStarLink web interfaces (Supermon, Allmon) work well on desktop but aren't optimized for mobile use. If you want to find and connect to an active node while away from your desk, you typically need to:
@@ -14,139 +24,130 @@ Current AllStarLink web interfaces (Supermon, Allmon) work well on desktop but a
 
 HyperMon simplifies this to: tap the active node, you're connected.
 
-## What Makes HyperMon Different
+## Features
 
 **Mobile-First Design**
-- Touch-optimized interface
+- Touch-optimized interface designed for phones
+- One-line layout: Callsign | Connections | Icon | Location
+- Large touch targets, no tiny buttons
 - Works on phones, tablets, and desktops
-- No squinting at tiny buttons
 
 **Active Node Discovery**
 - Shows currently keyed (transmitting) nodes from AllStarLink's live stats
 - See what's happening right now across the network
-- One tap to connect to any active node
+- Connection count displayed for each node
+- Auto-refreshes every 30 seconds
 
-**Zero Configuration**
-- Works immediately after install
-- No user accounts or databases required
-- Favorites and recent connections stored in your browser
+**Connection Management**
+- One-tap connect to any active node
+- Connected nodes panel at top with disconnect buttons
+- Integrates with AllMon3 for authentication
+- Auto-refresh connections every 15 seconds
 
 **Lightweight**
 - Runs on your Raspberry Pi alongside ASL3
 - Minimal resource usage
+- 30-second caching to reduce server load
 - Fast page loads
+
+## Setup
+
+After installation, click "Config" and enter:
+
+- **AllMon3 URL**: Your AllMon3 installation URL (e.g., `http://your-ip/allmon3/`)
+- **Username**: Your AllMon3 username
+- **Password**: Your AllMon3 password
+- **Your Node Number**: Your node number
+
+Configuration is saved in your browser's local storage.
+
+## Requirements
+
+- AllStarLink node (ASL3 recommended)
+- AllMon3 installed and configured
+- Apache/nginx with PHP support
+- PHP cURL extension
 
 ## Current Status
 
-**This project is in early development.** The basic architecture is planned, but implementation is just beginning.
+**Working:**
+- Active node discovery from AllStarLink stats
+- AllMon3 integration for connections
+- Mobile-responsive layout
+- Connection/disconnection management
+- Auto-refresh and caching
 
-What works:
-- Research into AllStarLink APIs
-- Architecture planning
-
-What's needed:
-- Everything else
-
-## Planned Features
-
-**v1.0 Core Features:**
-- View currently keyed nodes from AllStarLink network
-- One-tap connect/disconnect
-- Visual status indicators (connected, transmitting, idle)
-- Favorites list
+**Roadmap:**
+- Favorites management
 - Recent connections history
-- Your node status display
+- Search/filter nodes
+- PWA features (install to home screen)
+- Installation script
 
-**Future Considerations:**
-- Multiple node support
-- Audio level indicators
-- Connection notifications
-- Custom node groups
+## Technical Details
 
-## Technical Approach
+**Backend:** PHP
+- Scrapes AllStarLink stats page for keyed nodes
+- Integrates with AllMon3 API for connections
+- Implements caching to respect rate limits
 
-**Backend:** PHP (like Supermon/AllScan)
-- Communicates with Asterisk Manager Interface (AMI)
-- Fetches active node data from AllStarLink stats API
-- Minimal server-side logic
+**Frontend:** Vanilla JavaScript + CSS
+- No frameworks or dependencies
+- Browser localStorage for configuration
+- Responsive design with CSS Grid/Flexbox
 
-**Frontend:** Vanilla JavaScript + Modern CSS
-- No heavy frameworks
-- Fast and responsive
-- Progressive Web App capabilities
+**Data Flow:**
+1. PHP backend fetches keyed nodes from stats.allstarlink.org
+2. Caches results for 30 seconds
+3. Frontend displays and auto-refreshes
+4. Connections made via AllMon3's link.php endpoint
 
-**Data Storage:**
-- Browser localStorage for favorites and recents
-- No database required for basic functionality
+## API Information
 
-## Installation
-
-Installation instructions will be provided once the initial release is ready.
+HyperMon uses:
+- AllStarLink stats page: `https://stats.allstarlink.org/stats/keyed`
+- AllMon3 API for connections and node status
+- 30-second caching to respect rate limits
 
 ## Contributing
 
-This project needs help from the AllStarLink community. If you have experience with:
+Contributions welcome! Areas that need work:
 
-- PHP and AMI integration
-- Mobile-responsive web design
-- AllStarLink node operation
-- Testing on different devices
-
-Your contributions are welcome.
+- Testing on different devices and browsers
+- Installation script development
+- PWA implementation
+- Favorites/history features
+- UI/UX improvements
 
 **How to Contribute:**
-1. Check the Issues tab for tasks that need doing
-2. Fork the repository
+1. Fork the repository
+2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
 
 Please keep contributions focused on the core goal: a simple, fast, mobile-friendly interface for connecting to active AllStar nodes.
 
-## API Information
-
-HyperMon uses AllStarLink's public APIs:
-
-- **Node List:** `http://stats.allstarlink.org/api/stats/mapData`
-- **Keyed Nodes:** `http://stats.allstarlink.org/stats/keyed` (investigating endpoint)
-- **Node Stats:** `http://stats.allstarlink.org/stats.php?node=[NODE]`
-
-API rate limit: 30 requests per minute per IP address.
-
 ## Relationship to Other Projects
 
-**AllScan** by davidgsd is an excellent project with comprehensive features, favorites management, and stats integration. If you need a full-featured dashboard, use AllScan.
+**AllScan** by davidgsd is an excellent full-featured dashboard with comprehensive stats and favorites management.
 
-HyperMon focuses specifically on mobile use and active node discovery. It's not trying to replace AllScan or Supermon—it's solving a different problem.
+**Supermon/Allmon** are established web interfaces with many advanced features.
 
-## Development Roadmap
-
-**Phase 1: Basic Functionality**
-- [ ] Fetch and display keyed nodes
-- [ ] AMI integration for connect/disconnect
-- [ ] Basic status display
-- [ ] Mobile-responsive layout
-
-**Phase 2: Essential Features**
-- [ ] Favorites management
-- [ ] Recent connections
-- [ ] Search/filter nodes
-- [ ] One-tap connect with auto-disconnect option
-
-**Phase 3: Polish**
-- [ ] Progressive Web App features
-- [ ] Installation script
-- [ ] Configuration options
-- [ ] Documentation
+HyperMon focuses specifically on **mobile use** and **active node discovery**. It's not trying to replace these projects—it's solving a different problem: making it easy to find and connect to active nodes from your phone.
 
 ## License
 
 GPL-3.0 (same as Supermon and AllScan)
 
-## Contact
+## Acknowledgments
+
+Thanks to:
+- AllStarLink developers and community
+- Supermon, Allmon, and AllScan creators
+- Everyone testing and contributing to HyperMon
+
+## Support
 
 - GitHub Issues for bugs and feature requests
 - Discussions tab for questions and ideas
-
-## Acknowledgments
-
-Thanks to the AllStarLink developers and community, and to the creators of Supermon, Allmon, and AllScan for showing what's possible with ASL web interfaces.
+- Pull requests welcome
