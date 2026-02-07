@@ -1,10 +1,10 @@
 <?php
 /**
- * HyperMon API Backend
+ * HyperMon API Backend - v1.3 Fixed
  * 
  * Provides endpoints for:
  * - Fetching keyed nodes from AllStarLink
- * - Connecting/disconnecting nodes via AllMon3
+ * - Connecting/disconnecting nodes via AllMon3 master/cmd
  * - Getting current connections
  */
 
@@ -79,6 +79,7 @@ function getConnections() {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     
     // Add basic auth if provided
     if (!empty($user) && !empty($pass)) {
@@ -121,7 +122,7 @@ function getConnections() {
 }
 
 /**
- * Connect to a remote node via AllMon3
+ * Connect to a remote node via AllMon3 master/cmd endpoint
  */
 function connectNode() {
     $allmonUrl = isset($_GET['allmonUrl']) ? $_GET['allmonUrl'] : '';
@@ -149,37 +150,29 @@ function connectNode() {
     // Clean up AllMon URL
     $allmonUrl = rtrim($allmonUrl, '/');
     
-    // AllMon3 connect endpoint - try API first, then fall back to link.php
-    // Remove trailing slash from allmonUrl if present
-    $baseUrl = rtrim($allmonUrl, '/');
-    $connectUrl = $baseUrl . '/api/link/' . urlencode($node) . '/' . urlencode($remote);
+    // AllMon3 uses master/cmd endpoint with Asterisk commands
+    // Command format: rpt cmd <node> ilink 3 <remote_node>
+    // 3 = connect
+    $command = "rpt cmd {$node} ilink 3 {$remote}";
     
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $connectUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_USERPWD, $user . ':' . $pass);
+    $result = sendAllMon3Command($allmonUrl, $node, $command, $user, $pass);
     
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
+    if ($result['success']) {
         echo json_encode([
             'success' => true,
-            'message' => "Connected to node $remote"
+            'message' => "Connected to node $remote",
+            'output' => $result['output']
         ]);
     } else {
         echo json_encode([
             'success' => false,
-            'error' => "Failed to connect (HTTP $httpCode)"
+            'error' => $result['error']
         ]);
     }
 }
 
 /**
- * Disconnect from a remote node via AllMon3
+ * Disconnect from a remote node via AllMon3 master/cmd endpoint
  */
 function disconnectNode() {
     $allmonUrl = isset($_GET['allmonUrl']) ? $_GET['allmonUrl'] : '';
@@ -207,32 +200,96 @@ function disconnectNode() {
     // Clean up AllMon URL
     $allmonUrl = rtrim($allmonUrl, '/');
     
-    // AllMon3 disconnect endpoint
-    $baseUrl = rtrim($allmonUrl, '/');
-    $disconnectUrl = $baseUrl . '/api/unlink/' . urlencode($node) . '/' . urlencode($remote);
+    // AllMon3 uses master/cmd endpoint with Asterisk commands
+    // Command format: rpt cmd <node> ilink 1 <remote_node>
+    // 1 = disconnect
+    $command = "rpt cmd {$node} ilink 1 {$remote}";
     
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $disconnectUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_USERPWD, $user . ':' . $pass);
+    $result = sendAllMon3Command($allmonUrl, $node, $command, $user, $pass);
     
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
+    if ($result['success']) {
         echo json_encode([
             'success' => true,
-            'message' => "Disconnected from node $remote"
+            'message' => "Disconnected from node $remote",
+            'output' => $result['output']
         ]);
     } else {
         echo json_encode([
             'success' => false,
-            'error' => "Failed to disconnect (HTTP $httpCode)"
+            'error' => $result['error']
         ]);
     }
+}
+
+/**
+ * Send a command to AllMon3's master/cmd endpoint
+ */
+function sendAllMon3Command($allmonUrl, $node, $command, $user, $pass) {
+    $baseUrl = rtrim($allmonUrl, '/');
+    $cmdUrl = $baseUrl . '/master/cmd';
+    
+    // Create form data
+    $postData = http_build_query([
+        'node' => $node,
+        'cmd' => $command
+    ]);
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $cmdUrl);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_USERPWD, $user . ':' . $pass);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/x-www-form-urlencoded',
+        'Content-Length: ' . strlen($postData)
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    
+    if ($httpCode === 200 && $response) {
+        $data = json_decode($response, true);
+        
+        if (isset($data['SUCCESS'])) {
+            $output = $data['SUCCESS'];
+            // Try to decode base64 if it's encoded
+            try {
+                $decoded = base64_decode($output, true);
+                if ($decoded !== false) {
+                    $output = $decoded;
+                }
+            } catch (Exception $e) {
+                // Keep original if decode fails
+            }
+            
+            return [
+                'success' => true,
+                'output' => $output
+            ];
+        } else if (isset($data['ERROR'])) {
+            return [
+                'success' => false,
+                'error' => $data['ERROR']
+            ];
+        } else if (isset($data['SECURITY'])) {
+            return [
+                'success' => false,
+                'error' => 'Security error: ' . $data['SECURITY']
+            ];
+        }
+    }
+    
+    // If we get here, something went wrong
+    return [
+        'success' => false,
+        'error' => "HTTP $httpCode" . ($curlError ? ": $curlError" : "")
+    ];
 }
 
 /**
@@ -347,7 +404,7 @@ function healthCheck() {
     echo json_encode([
         'status' => 'healthy',
         'service' => 'HyperMon API',
-        'version' => '1.0.0',
+        'version' => '1.3.0',
         'success' => true,
         'timestamp' => time()
     ]);
@@ -384,7 +441,6 @@ function fetchUrl($url) {
 
 /**
  * Parse HTML table into array of nodes
- * Enhanced to extract connection count
  */
 function parseNodesTable($html) {
     $nodes = [];
@@ -416,7 +472,7 @@ function parseNodesTable($html) {
                 $nodeNum = $nodeData[0];
                 
                 if (!empty($nodeNum) && is_numeric($nodeNum)) {
-                    // Try to extract connection count (often in description like "5 connections")
+                    // Try to extract connection count
                     $connections = null;
                     $description = isset($nodeData[4]) ? $nodeData[4] : '';
                     if (preg_match('/(\d+)\s+(?:connection|link)/i', $description, $matches)) {
