@@ -325,7 +325,7 @@
         }
 
         .hidden {
-            display: none;
+            display: none !important;
         }
 
         @media (max-width: 600px) {
@@ -366,7 +366,7 @@
             <h2>Configuration</h2>
             <div class="input-group">
                 <label for="allmon-url">AllMon3 URL</label>
-                <input type="url" id="allmon-url" placeholder="https://604010.ki9ng.com/allmon3/">
+                <input type="url" id="allmon-url" placeholder="https://604010.ki9ng.com/allmon3">
             </div>
             <div class="input-group">
                 <label for="allmon-user">AllMon3 Username</label>
@@ -388,11 +388,9 @@
         </div>
 
         <div class="main-content">
-            <div id="connected-container" class="hidden">
-                <div class="connected-panel">
-                    <h3>Connected Nodes</h3>
-                    <div id="connected-list"></div>
-                </div>
+            <div id="connected-container" class="connected-panel hidden">
+                <h3>Connected Nodes</h3>
+                <div id="connected-list"></div>
             </div>
 
             <div class="content-header">
@@ -401,7 +399,7 @@
                     <div class="node-count" id="node-count">Loading...</div>
                 </div>
                 <div class="button-group">
-                    <button class="btn-primary btn-small" onclick="loadKeyedNodes()">Refresh</button>
+                    <button class="btn-primary btn-small" onclick="loadKeyedNodes(); loadConnectedNodes();">Refresh</button>
                     <button class="btn-secondary btn-small" onclick="toggleConfig()">Config</button>
                 </div>
             </div>
@@ -443,6 +441,9 @@
 
         // Initialize on page load
         window.addEventListener('DOMContentLoaded', function() {
+            console.log('HyperMon starting up...');
+            console.log('Settings:', settings);
+            
             // Populate config fields
             document.getElementById('allmon-url').value = settings.allmonUrl;
             document.getElementById('allmon-user').value = settings.allmonUser;
@@ -481,6 +482,8 @@
 
             showConfigStatus('Configuration saved successfully', 'success');
             
+            console.log('Config saved:', settings);
+            
             // Refresh data with new config
             loadConnectedNodes();
             loadKeyedNodes();
@@ -507,21 +510,33 @@
 
         async function loadConnectedNodes() {
             if (!settings.allmonUrl || !settings.yourNode) {
+                console.log('Skipping connection load - not configured');
                 return;
             }
 
             try {
-                const response = await fetch(`${settings.proxyUrl}?action=get-connections&allmonUrl=${encodeURIComponent(settings.allmonUrl)}&node=${settings.yourNode}&user=${encodeURIComponent(settings.allmonUser)}&pass=${encodeURIComponent(settings.allmonPass)}`);
+                console.log('Loading connected nodes...');
+                const url = `${settings.proxyUrl}?action=get-connections&allmonUrl=${encodeURIComponent(settings.allmonUrl)}&node=${settings.yourNode}&user=${encodeURIComponent(settings.allmonUser)}&pass=${encodeURIComponent(settings.allmonPass)}`;
+                console.log('Fetching:', url);
+                
+                const response = await fetch(url);
                 const data = await response.json();
+                
+                console.log('Connection response:', data);
 
-                if (data.success && data.connections) {
-                    connectedNodes = data.connections;
+                if (data.success) {
+                    connectedNodes = data.connections || [];
+                    console.log('Connected nodes:', connectedNodes);
                     displayConnectedNodes();
-                    // Refresh keyed nodes display to show connection status
-                    loadKeyedNodes();
+                } else {
+                    console.warn('Failed to load connections:', data.error);
+                    connectedNodes = [];
+                    displayConnectedNodes();
                 }
             } catch (error) {
                 console.error('Error loading connections:', error);
+                connectedNodes = [];
+                displayConnectedNodes();
             }
         }
 
@@ -529,7 +544,9 @@
             const container = document.getElementById('connected-container');
             const listDiv = document.getElementById('connected-list');
 
-            if (connectedNodes.length === 0) {
+            console.log('Displaying connected nodes:', connectedNodes.length);
+
+            if (!connectedNodes || connectedNodes.length === 0) {
                 container.classList.add('hidden');
                 return;
             }
@@ -544,12 +561,33 @@
                             <div class="connected-number">${node.node}</div>
                             <div class="connected-callsign">${node.callsign || 'Unknown'}</div>
                         </div>
-                        <button class="btn-disconnect" onclick="disconnectNode('${node.node}')">Disconnect</button>
+                        <button class="btn-disconnect" onclick="event.stopPropagation(); disconnectNode('${node.node}')">Disconnect</button>
                     </div>
                 `;
             });
             
             listDiv.innerHTML = html;
+            
+            // Update the keyed nodes list to show connection indicators
+            updateNodeConnectionStatus();
+        }
+
+        function updateNodeConnectionStatus() {
+            const nodeItems = document.querySelectorAll('.node-item');
+            nodeItems.forEach(item => {
+                const onclick = item.getAttribute('onclick');
+                if (onclick) {
+                    const match = onclick.match(/'(\d+)'/);
+                    if (match) {
+                        const nodeNum = match[1];
+                        if (connectedNodes.some(cn => cn.node === nodeNum)) {
+                            item.classList.add('connected');
+                        } else {
+                            item.classList.remove('connected');
+                        }
+                    }
+                }
+            });
         }
 
         async function loadKeyedNodes() {
@@ -559,8 +597,11 @@
             showStatus('Loading active nodes...', 'loading');
 
             try {
+                console.log('Loading keyed nodes...');
                 const response = await fetch(`${settings.proxyUrl}?action=keyed-nodes`);
                 const data = await response.json();
+                
+                console.log('Keyed nodes response:', data);
 
                 if (data.success && data.nodes && data.nodes.length > 0) {
                     displayNodeList(data.nodes);
@@ -631,18 +672,26 @@
                 return;
             }
 
+            console.log('Connecting to node:', nodeNumber);
             showStatus(`Connecting to node ${nodeNumber}...`, 'loading');
 
             try {
-                const response = await fetch(`${settings.proxyUrl}?action=connect&allmonUrl=${encodeURIComponent(settings.allmonUrl)}&node=${settings.yourNode}&remote=${nodeNumber}&user=${encodeURIComponent(settings.allmonUser)}&pass=${encodeURIComponent(settings.allmonPass)}`);
+                const url = `${settings.proxyUrl}?action=connect&allmonUrl=${encodeURIComponent(settings.allmonUrl)}&node=${settings.yourNode}&remote=${nodeNumber}&user=${encodeURIComponent(settings.allmonUser)}&pass=${encodeURIComponent(settings.allmonPass)}`;
+                console.log('Connect URL:', url);
+                
+                const response = await fetch(url);
                 const data = await response.json();
+                
+                console.log('Connect response:', data);
 
                 if (data.success) {
                     showStatus(`Connected to node ${nodeNumber}`, 'success');
                     // Refresh connections after a short delay
-                    setTimeout(loadConnectedNodes, 2000);
+                    setTimeout(() => {
+                        loadConnectedNodes();
+                    }, 2000);
                 } else {
-                    showStatus(`Failed to connect: ${data.error}`, 'error');
+                    showStatus(`Failed to connect: ${data.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
                 console.error('Connection error:', error);
@@ -651,17 +700,25 @@
         }
 
         async function disconnectNode(nodeNumber) {
+            console.log('Disconnecting node:', nodeNumber);
             showStatus(`Disconnecting node ${nodeNumber}...`, 'loading');
 
             try {
-                const response = await fetch(`${settings.proxyUrl}?action=disconnect&allmonUrl=${encodeURIComponent(settings.allmonUrl)}&node=${settings.yourNode}&remote=${nodeNumber}&user=${encodeURIComponent(settings.allmonUser)}&pass=${encodeURIComponent(settings.allmonPass)}`);
+                const url = `${settings.proxyUrl}?action=disconnect&allmonUrl=${encodeURIComponent(settings.allmonUrl)}&node=${settings.yourNode}&remote=${nodeNumber}&user=${encodeURIComponent(settings.allmonUser)}&pass=${encodeURIComponent(settings.allmonPass)}`;
+                console.log('Disconnect URL:', url);
+                
+                const response = await fetch(url);
                 const data = await response.json();
+                
+                console.log('Disconnect response:', data);
 
                 if (data.success) {
                     showStatus(`Disconnected node ${nodeNumber}`, 'success');
-                    setTimeout(loadConnectedNodes, 1000);
+                    setTimeout(() => {
+                        loadConnectedNodes();
+                    }, 1000);
                 } else {
-                    showStatus(`Failed to disconnect: ${data.error}`, 'error');
+                    showStatus(`Failed to disconnect: ${data.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
                 console.error('Disconnect error:', error);
